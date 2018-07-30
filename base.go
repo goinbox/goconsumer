@@ -1,4 +1,4 @@
-package consumer
+package goconsumer
 
 import (
 	"github.com/goinbox/golog"
