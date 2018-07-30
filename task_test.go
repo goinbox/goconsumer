@@ -11,6 +11,13 @@ type DemoWorker struct {
 	*BaseWorker
 }
 
+func NewDemoWorker() IWorker {
+	worker := &DemoWorker{NewBaseWorker()}
+	worker.SetLineProcessFunc(worker.LineProcessFunc)
+
+	return worker
+}
+
 func (d *DemoWorker) LineProcessFunc(line []byte) error {
 	idStr := strconv.Itoa(d.Id)
 	fmt.Println("wid:" + idStr + " process line:" + string(line))
@@ -50,10 +57,8 @@ func (d *DemoConsumer) Stop() {
 func TestConsumerTask(t *testing.T) {
 	task := NewTask("Demo")
 	consumer := new(DemoConsumer)
-	worker := new(DemoWorker)
-	worker.BaseWorker = NewBaseWorker().SetLineProcessFunc(worker.LineProcessFunc)
 
 	task.SetConsumer(consumer).
-		SetWorker(10, worker).
+		SetWorker(10, NewDemoWorker).
 		Start()
 }

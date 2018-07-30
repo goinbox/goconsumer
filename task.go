@@ -15,7 +15,7 @@ type Task struct {
 	consumer IConsumer
 
 	workerNum int
-	worker    IWorker
+	nwf       NewWorkerFunc
 	wg        *sync.WaitGroup
 
 	lineCh chan []byte
@@ -43,10 +43,10 @@ func (t *Task) SetConsumer(consumer IConsumer) *Task {
 	return t
 }
 
-func (t *Task) SetWorker(workerNum int, worker IWorker) *Task {
+func (t *Task) SetWorker(workerNum int, nwf NewWorkerFunc) *Task {
 	t.workerNum = workerNum
 	t.lineCh = make(chan []byte, workerNum)
-	t.worker = worker
+	t.nwf = nwf
 
 	t.wg = new(sync.WaitGroup)
 	t.stopCh = make(chan bool, workerNum)
@@ -77,7 +77,14 @@ func (t *Task) consumerHandleFunc(message IMessage) error {
 
 func (t *Task) startWorker() {
 	for i := 0; i < t.workerNum; i++ {
-		go t.worker.Work(i+1, t.wg, t.lineCh, t.stopCh)
+		worker := t.nwf()
+		worker.SetWorkId(i + 1)
+		worker.SetLogger(t.logger)
+
+		go func() {
+			worker.Work(t.wg, t.lineCh, t.stopCh)
+		}()
+
 		t.wg.Add(1)
 	}
 }

@@ -18,8 +18,13 @@ type IConsumer interface {
 	Stop()
 }
 
+type NewWorkerFunc func() IWorker
+
 type IWorker interface {
-	Work(id int, wg *sync.WaitGroup, lineCh chan []byte, stopCh chan bool)
+	SetWorkId(id int)
+	SetLogger(logger golog.ILogger)
+
+	Work(wg *sync.WaitGroup, lineCh chan []byte, stopCh chan bool)
 }
 
 type LineProcessFunc func(line []byte) error
@@ -37,24 +42,22 @@ func NewBaseWorker() *BaseWorker {
 	}
 }
 
-func (b *BaseWorker) SetLogger(logger golog.ILogger) *BaseWorker {
+func (b *BaseWorker) SetWorkId(id int) {
+	b.Id = id
+}
+
+func (b *BaseWorker) SetLogger(logger golog.ILogger) {
 	b.Logger = logger
-
-	return b
 }
 
-func (b *BaseWorker) SetLineProcessFunc(lpf LineProcessFunc) *BaseWorker {
+func (b *BaseWorker) SetLineProcessFunc(lpf LineProcessFunc) {
 	b.lpf = lpf
-
-	return b
 }
 
-func (b *BaseWorker) Work(id int, wg *sync.WaitGroup, lineCh chan []byte, stopCh chan bool) {
+func (b *BaseWorker) Work(wg *sync.WaitGroup, lineCh chan []byte, stopCh chan bool) {
 	defer func() {
 		wg.Done()
 	}()
-
-	b.Id = id
 
 	for {
 		select {
