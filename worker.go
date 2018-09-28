@@ -6,33 +6,17 @@ import (
 	"sync"
 )
 
-type IMessage interface {
-	Body() []byte
-}
-
-type ConsumerHandleFunc func(message IMessage) error
-
-type IConsumer interface {
-	SetHandleFunc(hf ConsumerHandleFunc)
-	Start()
-	Stop()
-}
-
-type NewWorkerFunc func() IWorker
-
 type IWorker interface {
-	SetWorkId(id int)
-	SetLogger(logger golog.ILogger)
-
-	Work(wg *sync.WaitGroup, lineCh chan []byte, stopCh chan bool)
+	Id() int
+	Work(lineCh chan []byte, wg *sync.WaitGroup, stopCh chan bool)
 }
 
 type LineProcessFunc func(line []byte) error
 
 type BaseWorker struct {
 	Logger golog.ILogger
-	Id     int
 
+	id  int
 	lpf LineProcessFunc
 }
 
@@ -42,19 +26,23 @@ func NewBaseWorker() *BaseWorker {
 	}
 }
 
-func (b *BaseWorker) SetWorkId(id int) {
-	b.Id = id
-}
-
 func (b *BaseWorker) SetLogger(logger golog.ILogger) {
 	b.Logger = logger
+}
+
+func (b *BaseWorker) SetId(id int) {
+	b.id = id
 }
 
 func (b *BaseWorker) SetLineProcessFunc(lpf LineProcessFunc) {
 	b.lpf = lpf
 }
 
-func (b *BaseWorker) Work(wg *sync.WaitGroup, lineCh chan []byte, stopCh chan bool) {
+func (b *BaseWorker) Id() int {
+	return b.id
+}
+
+func (b *BaseWorker) Work(lineCh chan []byte, wg *sync.WaitGroup, stopCh chan bool) {
 	defer func() {
 		wg.Done()
 	}()

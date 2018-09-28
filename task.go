@@ -5,20 +5,17 @@ import (
 
 	"bytes"
 	"sync"
-	"time"
 )
 
 type Task struct {
 	Name string
 
-	logger   golog.ILogger
-	consumer IConsumer
+	logger     golog.ILogger
+	consumer   IConsumer
+	dispatcher IDispatcher
+	workerList []IWorker
 
-	workerNum int
-	nwf       NewWorkerFunc
-	wg        *sync.WaitGroup
-
-	lineCh chan []byte
+	wg     *sync.WaitGroup
 	stopCh chan bool
 }
 
@@ -27,6 +24,8 @@ func NewTask(name string) *Task {
 		Name: name,
 
 		logger: new(golog.NoopLogger),
+
+		wg: new(sync.WaitGroup),
 	}
 }
 
@@ -43,13 +42,16 @@ func (t *Task) SetConsumer(consumer IConsumer) *Task {
 	return t
 }
 
-func (t *Task) SetWorker(workerNum int, nwf NewWorkerFunc) *Task {
-	t.workerNum = workerNum
-	t.lineCh = make(chan []byte, workerNum)
-	t.nwf = nwf
+func (t *Task) SetDispatcher(dispatcher IDispatcher) *Task {
+	t.dispatcher = dispatcher
 
-	t.wg = new(sync.WaitGroup)
-	t.stopCh = make(chan bool, workerNum)
+	return t
+}
+
+func (t *Task) SetWorkerList(workerList []IWorker) *Task {
+	t.workerList = workerList
+
+	t.stopCh = make(chan bool, len(workerList))
 
 	return t
 }
@@ -68,7 +70,7 @@ func (t *Task) consumerHandleFunc(message IMessage) error {
 	for _, line := range bytes.Split(message.Body(), []byte{'\n'}) {
 		line = bytes.TrimSpace(line)
 		if len(line) != 0 {
-			t.lineCh <- line
+			t.dispatcher.DispatchLine(line)
 		}
 	}
 
@@ -76,14 +78,9 @@ func (t *Task) consumerHandleFunc(message IMessage) error {
 }
 
 func (t *Task) startWorker() {
-	for i := 0; i < t.workerNum; i++ {
-		worker := t.nwf()
-		worker.SetWorkId(i + 1)
-		worker.SetLogger(t.logger)
-
-		go func() {
-			worker.Work(t.wg, t.lineCh, t.stopCh)
-		}()
+	for _, worker := range t.workerList {
+		lineCh := t.dispatcher.DispatchLineChannel(worker)
+		go worker.Work(lineCh, t.wg, t.stopCh)
 
 		t.wg.Add(1)
 	}
@@ -91,12 +88,9 @@ func (t *Task) startWorker() {
 
 func (t *Task) stopWorker() {
 	t.consumer.Stop()
+	t.dispatcher.Wait()
 
-	for len(t.lineCh) != 0 {
-		time.Sleep(time.Second * 1)
-	}
-
-	for i := 0; i < t.workerNum; i++ {
+	for i := 0; i < len(t.workerList); i++ {
 		t.stopCh <- true
 	}
 

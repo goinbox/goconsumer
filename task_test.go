@@ -3,23 +3,21 @@ package goconsumer
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
+)
+
+const (
+	DEMO_WORKER_NUM = 10
 )
 
 type DemoWorker struct {
 	*BaseWorker
 }
 
-func NewDemoWorker() IWorker {
-	worker := &DemoWorker{NewBaseWorker()}
-	worker.SetLineProcessFunc(worker.LineProcessFunc)
-
-	return worker
-}
-
 func (d *DemoWorker) LineProcessFunc(line []byte) error {
-	idStr := strconv.Itoa(d.Id)
+	idStr := strconv.Itoa(d.Id())
 	fmt.Println("wid:" + idStr + " process line:" + string(line))
 
 	return nil
@@ -54,11 +52,46 @@ func (d *DemoConsumer) Stop() {
 
 }
 
-func TestConsumerTask(t *testing.T) {
-	task := NewTask("Demo")
+func TestSimpleConsumerTask(t *testing.T) {
 	consumer := new(DemoConsumer)
+	dispatcher := NewSimpleDispatcher(DEMO_WORKER_NUM)
+	workerList := make([]IWorker, DEMO_WORKER_NUM)
+	for i := 0; i < DEMO_WORKER_NUM; i++ {
+		worker := &DemoWorker{NewBaseWorker()}
+		worker.SetId(i)
+		worker.SetLineProcessFunc(worker.LineProcessFunc)
+		workerList[i] = worker
+	}
 
+	task := NewTask("Demo")
 	task.SetConsumer(consumer).
-		SetWorker(10, NewDemoWorker).
+		SetDispatcher(dispatcher).
+		SetWorkerList(workerList).
+		Start()
+}
+
+func specifyDispatchLineFunc(line []byte) int {
+	item := strings.Split(string(line), " ")
+	vs := item[len(item)-1]
+	v, _ := strconv.Atoi(vs)
+
+	return v % DEMO_WORKER_NUM
+}
+
+func TestSpecifyConsumerTask(t *testing.T) {
+	consumer := new(DemoConsumer)
+	workerList := make([]IWorker, 10)
+	for i := 0; i < 10; i++ {
+		worker := &DemoWorker{NewBaseWorker()}
+		worker.SetId(i)
+		worker.SetLineProcessFunc(worker.LineProcessFunc)
+		workerList[i] = worker
+	}
+	dispatcher := NewSpecifyDispatcher(workerList, 10, specifyDispatchLineFunc)
+
+	task := NewTask("Demo")
+	task.SetConsumer(consumer).
+		SetDispatcher(dispatcher).
+		SetWorkerList(workerList).
 		Start()
 }
