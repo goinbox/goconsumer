@@ -55,8 +55,11 @@ func NewSpecifyDispatcher(workerList []IWorker, bufLen int, dlf DispatchLineFunc
 }
 
 func (s *specifyDispatcher) DispatchLine(line []byte) {
-	lineCh := s.lineChMap[s.dlf(line)]
-	lineCh <- line
+	i := s.dlf(line)
+	lineCh, ok := s.lineChMap[i]
+	if ok {
+		lineCh <- line
+	}
 }
 
 func (s *specifyDispatcher) DispatchLineChannel(worker IWorker) chan []byte {
