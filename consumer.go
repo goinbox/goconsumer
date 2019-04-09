@@ -11,3 +11,11 @@ type IConsumer interface {
 	Start()
 	Stop()
 }
+
+type BaseConsumer struct {
+	HandleFunc ConsumerHandleFunc
+}
+
+func (b *BaseConsumer) SetHandleFunc(hf ConsumerHandleFunc) {
+	b.HandleFunc = hf
+}

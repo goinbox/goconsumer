@@ -62,8 +62,10 @@ func (t *Task) Start() {
 }
 
 func (t *Task) Stop() {
-	t.stopWorker()
 	t.consumer.Stop()
+	t.dispatcher.Wait()
+
+	t.stopWorker()
 }
 
 func (t *Task) consumerHandleFunc(message IMessage) error {
@@ -87,9 +89,6 @@ func (t *Task) startWorker() {
 }
 
 func (t *Task) stopWorker() {
-	t.consumer.Stop()
-	t.dispatcher.Wait()
-
 	for i := 0; i < len(t.workerList); i++ {
 		t.stopCh <- true
 	}

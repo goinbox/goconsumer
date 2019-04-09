@@ -32,24 +32,27 @@ func (d *DemoMessage) Body() []byte {
 }
 
 type DemoConsumer struct {
-	hf ConsumerHandleFunc
-}
+	BaseConsumer
 
-func (d *DemoConsumer) SetHandleFunc(hf ConsumerHandleFunc) {
-	d.hf = hf
+	stop bool
 }
 
 func (d *DemoConsumer) Start() {
-	for i := 0; i < 100; i++ {
+	i := 0
+	for {
 		str := "This message is from DemoConsumer loop " + strconv.Itoa(i)
-		d.hf(&DemoMessage{[]byte(str)})
-	}
+		_ = d.HandleFunc(&DemoMessage{[]byte(str)})
 
-	time.Sleep(time.Second * 1)
+		i++
+		time.Sleep(time.Second * 1)
+		if d.stop {
+			return
+		}
+	}
 }
 
 func (d *DemoConsumer) Stop() {
-
+	d.stop = true
 }
 
 func TestSimpleConsumerTask(t *testing.T) {
@@ -63,11 +66,14 @@ func TestSimpleConsumerTask(t *testing.T) {
 		workerList[i] = worker
 	}
 
-	task := NewTask("Demo")
-	task.SetConsumer(consumer).
+	task := NewTask("Demo").
+		SetConsumer(consumer).
 		SetDispatcher(dispatcher).
-		SetWorkerList(workerList).
-		Start()
+		SetWorkerList(workerList)
+
+	go task.Start()
+	time.Sleep(time.Second * 10)
+	task.Stop()
 }
 
 func specifyDispatchLineFunc(line []byte) int {
@@ -89,9 +95,12 @@ func TestSpecifyConsumerTask(t *testing.T) {
 	}
 	dispatcher := NewSpecifyDispatcher(workerList, 10, specifyDispatchLineFunc)
 
-	task := NewTask("Demo")
-	task.SetConsumer(consumer).
+	task := NewTask("Demo").
+		SetConsumer(consumer).
 		SetDispatcher(dispatcher).
-		SetWorkerList(workerList).
-		Start()
+		SetWorkerList(workerList)
+
+	go task.Start()
+	time.Sleep(time.Second * 10)
+	task.Stop()
 }
