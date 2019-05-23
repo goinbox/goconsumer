@@ -7,22 +7,28 @@ import (
 )
 
 type IWorker interface {
-	Id() int
-	Work(lineCh chan []byte, wg *sync.WaitGroup, stopCh chan bool)
+	Start(wg *sync.WaitGroup)
+	Stop()
+	Assign(line []byte) error
 }
 
 type LineProcessFunc func(line []byte) error
 
 type BaseWorker struct {
 	Logger golog.ILogger
+	Id     int
 
-	id  int
 	lpf LineProcessFunc
+
+	lineCh chan []byte
+	stopCh chan bool
 }
 
 func NewBaseWorker() *BaseWorker {
 	return &BaseWorker{
 		Logger: new(golog.NoopLogger),
+
+		stopCh: make(chan bool),
 	}
 }
 
@@ -30,32 +36,42 @@ func (b *BaseWorker) SetLogger(logger golog.ILogger) {
 	b.Logger = logger
 }
 
-func (b *BaseWorker) SetId(id int) {
-	b.id = id
-}
-
 func (b *BaseWorker) SetLineProcessFunc(lpf LineProcessFunc) {
 	b.lpf = lpf
 }
 
-func (b *BaseWorker) Id() int {
-	return b.id
+func (b *BaseWorker) SetLineCh(lineCh chan []byte) {
+	b.lineCh = lineCh
 }
 
-func (b *BaseWorker) Work(lineCh chan []byte, wg *sync.WaitGroup, stopCh chan bool) {
+func (b *BaseWorker) Start(wg *sync.WaitGroup) {
 	defer func() {
 		wg.Done()
 	}()
 
+	if b.lineCh == nil {
+		b.lineCh = make(chan []byte)
+	}
+
 	for {
 		select {
-		case line := <-lineCh:
+		case line := <-b.lineCh:
 			err := b.lpf(line)
 			if err != nil {
 				b.Logger.Error([]byte("processLineError:" + err.Error()))
 			}
-		case <-stopCh:
+		case <-b.stopCh:
 			return
 		}
 	}
+}
+
+func (b *BaseWorker) Stop() {
+	b.stopCh <- true
+}
+
+func (b *BaseWorker) Assign(line []byte) error {
+	b.lineCh <- line
+
+	return nil
 }

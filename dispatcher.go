@@ -1,75 +1,41 @@
 package goconsumer
 
-import (
-	"time"
-)
-
 type IDispatcher interface {
-	DispatchLine(line []byte)
-	DispatchLineChannel(worker IWorker) chan []byte
-	Wait()
+	Dispatch(line []byte) int
 }
 
 type simpleDispatcher struct {
-	lineCh chan []byte
+	index int
+	max   int
 }
 
 func NewSimpleDispatcher(workerNum int) *simpleDispatcher {
 	return &simpleDispatcher{
-		lineCh: make(chan []byte, workerNum),
+		index: 0,
+		max:   workerNum,
 	}
 }
 
-func (s *simpleDispatcher) DispatchLine(line []byte) {
-	s.lineCh <- line
+func (s *simpleDispatcher) Dispatch(line []byte) int {
+	defer func() {
+		s.index = (s.index + 1) % s.max
+	}()
+
+	return s.index
 }
 
-func (s *simpleDispatcher) DispatchLineChannel(worker IWorker) chan []byte {
-	return s.lineCh
-}
-
-func (s *simpleDispatcher) Wait() {
-	for len(s.lineCh) != 0 {
-		time.Sleep(time.Second * 1)
-	}
-}
-
-type DispatchLineFunc func(line []byte) int
+type DispatchFunc func(line []byte) int
 
 type specifyDispatcher struct {
-	lineChMap map[int]chan []byte
-	dlf       DispatchLineFunc
+	dlf DispatchFunc
 }
 
-func NewSpecifyDispatcher(workerList []IWorker, bufLen int, dlf DispatchLineFunc) *specifyDispatcher {
-	s := &specifyDispatcher{
-		lineChMap: make(map[int]chan []byte),
-		dlf:       dlf,
-	}
-
-	for _, worker := range workerList {
-		s.lineChMap[worker.Id()] = make(chan []byte, bufLen)
-	}
-
-	return s
-}
-
-func (s *specifyDispatcher) DispatchLine(line []byte) {
-	i := s.dlf(line)
-	lineCh, ok := s.lineChMap[i]
-	if ok {
-		lineCh <- line
+func NewSpecifyDispatcher(dlf DispatchFunc) *specifyDispatcher {
+	return &specifyDispatcher{
+		dlf: dlf,
 	}
 }
 
-func (s *specifyDispatcher) DispatchLineChannel(worker IWorker) chan []byte {
-	return s.lineChMap[worker.Id()]
-}
-
-func (s *specifyDispatcher) Wait() {
-	for _, lineCh := range s.lineChMap {
-		for len(lineCh) != 0 {
-			time.Sleep(time.Second * 1)
-		}
-	}
+func (s *specifyDispatcher) Dispatch(line []byte) int {
+	return s.dlf(line)
 }

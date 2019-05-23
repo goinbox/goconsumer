@@ -17,18 +17,10 @@ type DemoWorker struct {
 }
 
 func (d *DemoWorker) LineProcessFunc(line []byte) error {
-	idStr := strconv.Itoa(d.Id())
+	idStr := strconv.Itoa(d.Id)
 	fmt.Println("wid:" + idStr + " process line:" + string(line))
 
 	return nil
-}
-
-type DemoMessage struct {
-	body []byte
-}
-
-func (d *DemoMessage) Body() []byte {
-	return d.body
 }
 
 type DemoConsumer struct {
@@ -41,7 +33,7 @@ func (d *DemoConsumer) Start() {
 	i := 0
 	for {
 		str := "This message is from DemoConsumer loop " + strconv.Itoa(i)
-		_ = d.HandleFunc(&DemoMessage{[]byte(str)})
+		_ = d.MessageCallback([]byte(str))
 
 		i++
 		time.Sleep(time.Second * 1)
@@ -56,13 +48,15 @@ func (d *DemoConsumer) Stop() {
 }
 
 func TestSimpleConsumerTask(t *testing.T) {
+	lineCh := make(chan []byte)
 	consumer := new(DemoConsumer)
 	dispatcher := NewSimpleDispatcher(DEMO_WORKER_NUM)
 	workerList := make([]IWorker, DEMO_WORKER_NUM)
 	for i := 0; i < DEMO_WORKER_NUM; i++ {
 		worker := &DemoWorker{NewBaseWorker()}
-		worker.SetId(i)
+		worker.Id = i
 		worker.SetLineProcessFunc(worker.LineProcessFunc)
+		worker.SetLineCh(lineCh)
 		workerList[i] = worker
 	}
 
@@ -89,11 +83,11 @@ func TestSpecifyConsumerTask(t *testing.T) {
 	workerList := make([]IWorker, 10)
 	for i := 0; i < 10; i++ {
 		worker := &DemoWorker{NewBaseWorker()}
-		worker.SetId(i)
+		worker.Id = i
 		worker.SetLineProcessFunc(worker.LineProcessFunc)
 		workerList[i] = worker
 	}
-	dispatcher := NewSpecifyDispatcher(workerList, 10, specifyDispatchLineFunc)
+	dispatcher := NewSpecifyDispatcher(specifyDispatchLineFunc)
 
 	task := NewTask("Demo").
 		SetConsumer(consumer).

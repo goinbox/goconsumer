@@ -15,8 +15,7 @@ type Task struct {
 	dispatcher IDispatcher
 	workerList []IWorker
 
-	wg     *sync.WaitGroup
-	stopCh chan bool
+	wg *sync.WaitGroup
 }
 
 func NewTask(name string) *Task {
@@ -37,7 +36,7 @@ func (t *Task) SetLogger(logger golog.ILogger) *Task {
 
 func (t *Task) SetConsumer(consumer IConsumer) *Task {
 	t.consumer = consumer
-	t.consumer.SetHandleFunc(t.consumerHandleFunc)
+	t.consumer.SetMessageCallback(t.consumerMessageCallback)
 
 	return t
 }
@@ -51,47 +50,37 @@ func (t *Task) SetDispatcher(dispatcher IDispatcher) *Task {
 func (t *Task) SetWorkerList(workerList []IWorker) *Task {
 	t.workerList = workerList
 
-	t.stopCh = make(chan bool, len(workerList))
-
 	return t
 }
 
 func (t *Task) Start() {
-	t.startWorker()
+	for _, worker := range t.workerList {
+		go worker.Start(t.wg)
+
+		t.wg.Add(1)
+	}
+
 	t.consumer.Start()
 }
 
 func (t *Task) Stop() {
 	t.consumer.Stop()
-	t.dispatcher.Wait()
 
-	t.stopWorker()
+	for _, worker := range t.workerList {
+		worker.Stop()
+	}
+
+	t.wg.Wait()
 }
 
-func (t *Task) consumerHandleFunc(message IMessage) error {
-	for _, line := range bytes.Split(message.Body(), []byte{'\n'}) {
+func (t *Task) consumerMessageCallback(msg []byte) error {
+	for _, line := range bytes.Split(msg, []byte{'\n'}) {
 		line = bytes.TrimSpace(line)
 		if len(line) != 0 {
-			t.dispatcher.DispatchLine(line)
+			i := t.dispatcher.Dispatch(line)
+			_ = t.workerList[i].Assign(line)
 		}
 	}
 
 	return nil
-}
-
-func (t *Task) startWorker() {
-	for _, worker := range t.workerList {
-		lineCh := t.dispatcher.DispatchLineChannel(worker)
-		go worker.Work(lineCh, t.wg, t.stopCh)
-
-		t.wg.Add(1)
-	}
-}
-
-func (t *Task) stopWorker() {
-	for i := 0; i < len(t.workerList); i++ {
-		t.stopCh <- true
-	}
-
-	t.wg.Wait()
 }

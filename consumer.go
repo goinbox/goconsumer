@@ -1,21 +1,17 @@
 package goconsumer
 
-type IMessage interface {
-	Body() []byte
-}
-
-type ConsumerHandleFunc func(message IMessage) error
+type ConsumerMessageCallback func(msg []byte) error
 
 type IConsumer interface {
-	SetHandleFunc(hf ConsumerHandleFunc)
+	SetMessageCallback(hf ConsumerMessageCallback)
 	Start()
 	Stop()
 }
 
 type BaseConsumer struct {
-	HandleFunc ConsumerHandleFunc
+	MessageCallback ConsumerMessageCallback
 }
 
-func (b *BaseConsumer) SetHandleFunc(hf ConsumerHandleFunc) {
-	b.HandleFunc = hf
+func (b *BaseConsumer) SetMessageCallback(mcb ConsumerMessageCallback) {
+	b.MessageCallback = mcb
 }
