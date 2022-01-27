@@ -15,7 +15,7 @@ type IWorker interface {
 type LineProcessFunc func(line []byte) error
 
 type BaseWorker struct {
-	Logger golog.ILogger
+	Logger golog.Logger
 	Id     int
 
 	lpf LineProcessFunc
@@ -32,7 +32,7 @@ func NewBaseWorker() *BaseWorker {
 	}
 }
 
-func (b *BaseWorker) SetLogger(logger golog.ILogger) {
+func (b *BaseWorker) SetLogger(logger golog.Logger) {
 	b.Logger = logger
 }
 
@@ -58,7 +58,7 @@ func (b *BaseWorker) Start(wg *sync.WaitGroup) {
 		case line := <-b.lineCh:
 			err := b.lpf(line)
 			if err != nil {
-				b.Logger.Error([]byte("processLineError:" + err.Error()))
+				b.Logger.Error("processLineError", golog.ErrorField(err))
 			}
 		case <-b.stopCh:
 			return

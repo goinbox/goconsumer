@@ -10,7 +10,7 @@ import (
 type Task struct {
 	Name string
 
-	logger     golog.ILogger
+	logger     golog.Logger
 	consumer   IConsumer
 	dispatcher IDispatcher
 	workerList []IWorker
@@ -28,7 +28,7 @@ func NewTask(name string) *Task {
 	}
 }
 
-func (t *Task) SetLogger(logger golog.ILogger) *Task {
+func (t *Task) SetLogger(logger golog.Logger) *Task {
 	t.logger = logger
 
 	return t
